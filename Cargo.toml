@@ -1,0 +1,54 @@
+[package]
+name = "rust-windbg"
+version = "0.1.0"
+edition = "2021"
+default-run = "panic_hook"
+
+[dependencies]
+libc = "0.2.155"
+microseh = "1.0.3"
+winapi = { version = "0.3.9", features = ["processthreadsapi", "winnt"] }
+
+[dependencies.windows]
+version = "0.56.0"
+features = [
+    "Wdk",
+    "Wdk_System",
+    "Wdk_System_Threading",
+    "Win32_System_Threading",
+    "Data_Xml_Dom",
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_Diagnostics_Debug_Extensions",
+]
+
+[profile.release]
+lto = true                  # Enable Link-Time Optimization for smaller binaries; good practice when using large crates like windows
+debug = 1                   # enable symbols for release builds
+split-debuginfo = "packed"  # Store debug info in a separate file
+overflow-checks = true      # enable arithmetic overflow checks
+codegen-units = 1           # tries to reduce inline opportunities
+
+[[bin]]
+name = "stack_overflow"
+path = "./bug_samples/stack_overflow.rs"
+
+[[bin]]
+name = "stack_overflow_v2"
+path = "./bug_samples/stack_overflow_v2.rs"
+
+[[bin]]
+name = "stack_overflow_v3"
+path = "./bug_samples/stack_overflow_v3.rs"
+
+[[bin]]
+name = "stack_overflow_v4"
+path = "./bug_samples/stack_overflow_v4.rs"
+
+[[bin]]
+name = "panic_hook"
+path = "./bug_samples/panic_hook.rs"
+
+[[bin]]
+name = "panic_hook_does_not_get_sigsegv"
+path = "./bug_samples/panic_hook_does_not_get_sigsegv.rs"
