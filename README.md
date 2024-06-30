@@ -1091,9 +1091,9 @@ thread 'thread1' has overflowed its stack
 error: process didn't exit successfully: `target\debug\stack_overflow_v2.exe` (exit code: 0xc00000fd, STATUS_STACK_OVERFLOW)
 ```
 
-Interesting that the results still differ slightly between --release and debug targets.  
+Interesting that the results still differ slightly between --release and dev targets.  
 At least the stacks extents are the same for both cases.  
-It is also interesting to notice that the stacks are placed are located next to each other.  
+It is also interesting to notice that the stacks are located next to each other.  
 For both targets, the stack for thread1 starts where the stack for the main thread ends.  
 They are contiguous in memory. We should not rely on this information but it is interesting to know that this takes place.
 </details>
@@ -1128,7 +1128,7 @@ Notice first two characters on each stack entry. That is the frame index. Let's 
 ((stack_overflow!stack_overflow::FactorialArgument *)0x1463128638)                 : 0x1463128638 [Type: stack_overflow::FactorialArgument *]
     [+0x000] array            [Type: unsigned __int64 [127]]
     [+0x3f8] idx              : 0x5b [Type: unsigned __int64]
-0:004> * seems like when it run out of stack, we were processing 91 (0x5b)
+0:004> * seems like when it runs out of stack, we were processing 91 (0x5b)
 0:004> * so we should have on the stack call with arg values 100, 99, 98, ... until 91
 
 0:004> * next I click on `new_arg` link on WinDBG UI
@@ -1210,7 +1210,7 @@ OK
 ---------------------------
 ```
 
-Most likely the reason is that the RELEASE mode optimizations inlined my so the debugger cannot get a good handle where the function begins now.  
+Most likely the reason is that the RELEASE mode optimizations inlined my function so the debugger cannot get a good handle where the function begins now.  
 I would like to set a breakpoint on that function, so I change my `Cargo.toml` file to have this entry:  
 
 ```
