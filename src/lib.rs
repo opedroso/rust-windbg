@@ -75,7 +75,7 @@ impl ThreadInfo {
 
         #[cfg(target_os = "linux")]
         {
-            let mut attr: libc::pthread_attr_t = std::mem::zeroed();
+            let mut attr: libc::pthread_attr_t = unsafe { std::mem::zeroed() };
             let err = unsafe { libc::pthread_getattr_np(libc::pthread_self(), &mut attr) };
 
             if err == 0 {

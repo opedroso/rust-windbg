@@ -17,7 +17,7 @@ fn main() {
     // Create a builder for the thread
     let builder = thread::Builder::new()
         .name("thread1".to_string()) // Set thread name
-        .stack_size(8 * 1024);  // set for a small stack (default for Windows processes is 1 MiB, minimum is 4 KiB)
+        .stack_size(8 * 1024);  // set for a small stack (default for Windows processes is 1 MiB)
 
     // Spawn the thread with my closure
     let handle = builder.spawn(move || {
