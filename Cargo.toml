@@ -5,6 +5,8 @@ edition = "2021"
 default-run = "stack_overflow_v2"
 
 [dependencies]
+libc = "0.2.155"
+microseh = "1.0.3"
 winapi = { version = "0.3.9", features = ["processthreadsapi", "winnt"] }
 
 [dependencies.windows]
@@ -42,4 +44,8 @@ path = "./bug_samples/stack_overflow_v3.rs"
 [[bin]]
 name = "stack_overflow_v4"
 path = "./bug_samples/stack_overflow_v4.rs"
+
+[[bin]]
+name = "panic_hook_does_not_get_sigsegv"
+path = "./bug_samples/panic_hook_does_not_get_sigsegv.rs"
 

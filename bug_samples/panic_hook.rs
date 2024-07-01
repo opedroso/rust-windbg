@@ -12,6 +12,10 @@ use std::io::Write;
 use libc::{sigaction, SA_ONSTACK, SA_SIGINFO, SIGBUS, SIGSEGV, c_void, siginfo_t};
 use rust_windbg::ThreadInfo;
 
+#[cfg(target_os = "windows")]
+compile_error!("This code is targeted for non-Windows platform only.");
+
+
 fn main() {
     // remembers main thread id
     ThreadInfo::init_from_main_thread();
@@ -50,15 +54,6 @@ fn main() {
             let ptr: *mut i32 = 0xC0000000 as *mut i32; // make ptr non-null and aligned if you really want to bypass write_volatile() pointer checks; then causes  Access violation - code c0000005 (first chance)
             unsafe { // Wanted to: Trigger access violation through volatile write    but instead causes ...
                 std::ptr::write_volatile(ptr, 42); // Security check failure or stack buffer overrun - code c0000409 (!!! second chance !!!)
-            }
-        } else if args.len() == 5 { // cargo run 1 2 3 4
-            if let Err(ex) = microseh::try_seh(|| unsafe {
-                std::arch::asm!("mov rax, 0; mov rax, [rax]"); // Assembly to dereference a null pointer
-            }) {
-                let thread_id = thread::current().id();
-                println!("microseh(tid={:?}", thread_id);
-                println!("address: {:x?}", ex.address());
-                println!("rax: {:x}", ex.registers().rax());
             }
         }
     } else { // cargo run

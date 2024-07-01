@@ -30,7 +30,7 @@ fn main() {
 fn force_access_violation() {
     // Code that causes an access violation (a.k.a. SIGSEGV) but does not call panic hook
 
-    eprintln!("forcing access violation through assembly");
+    eprintln!("forcing access violation through assembler instruction");
     // force an access violation
     unsafe {
         // causes in DEBUG or RELEASE a (exit code: 0xc0000005, STATUS_ACCESS_VIOLATION)

@@ -10,7 +10,8 @@ struct FactorialArgument {
     idx: usize,
 }
 
-
+#[cfg(not(target_os = "windows"))]
+compile_error!("This code is targeted for Windows platform only.");
 
 fn main() {
     // validate some assumptions
