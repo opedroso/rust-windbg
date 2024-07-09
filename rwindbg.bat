@@ -11,7 +11,7 @@
 :: you can attach to a running process by specifying it process_id:                             windbg ... -p [PID]
 :: you can attach to a running process by specifying it process name (as seen on TaskMgr):      windbg ... -pn [process_name.exe]
 :: you can freeze a running process (-pv) when attaching to it (-p PID or -pn name),
-:: inspect all its current stacks for all threads "~*k" and 
+:: inspect all its current stacks for all threads "~*k" and
 :: then resume running it "qd" command for quit and detach:                                     windbg ... -pv -p PID
 
 
@@ -19,56 +19,38 @@
 ::
 :: this script assumes we are executed from base of Rust project (where target directory gets created by cargo build)
 ::
-if NOT exist "Cargo.toml" @echo "Current directory expected to be at rust project directory!"
+@if NOT exist "Cargo.toml" @echo "Current directory expected to be at rust project directory!"
 
-::
-:: this will download source and symbols for your rust stable and nighlty toolchains (only if they are installed)
-::
-if exist "%USERPROFILE%\.rustup\toolchains\stable-x86_64-pc-windows-msvc" rustup component add rust-src > c:\NUL 2>&1
-if exist "%USERPROFILE%\.rustup\toolchains\nightly-x86_64-pc-windows-msvc" rustup +nightly component add rust-src > c:\NUL 2>&1
 
 ::
 :: all environment variable changes beyond this point only valid during script execution
 ::
-@setlocal
+@setlocal EnableExtensions
+@setlocal EnableDelayedExpansion
+
+
+::
+:: find the default toolchain we are using and load it's source
+::
+@for /f "delims=" %%i in ('rustc --print=sysroot') do set rustc_sysroot=%%i
+@set rust_etc_for_natvis=%rustc_sysroot%\lib\rustlib\etc
+@set rust_bin_for_pdb=%rustc_sysroot%\bin
+@set rust_src_for_rs=%rustc_sysroot%\lib\rustlib\src\rust
+@rustup component add rust-src > c:\NUL 2>&1
 
 
 ::
 :: where downloaded PDB (symbol files) will be cached
 ::
-set PDB_CACHE=c:\Symbols
-if NOT exist "%PDB_CACHE%" mkdir "%PDB_CACHE%\ms"
+set PDB_CACHE=%TEMP%\rwindbg\symbols
+@if NOT exist "%PDB_CACHE%\ms" mkdir "%PDB_CACHE%\ms"
 
 
 ::
-:: Microsoft and other public symbol providers are cached to "c:\Symbols\ms"
+:: where source files (referenced in the symbol files) will be downloaded
 ::
-set _NT_SYMBOL_PATH=cache*%PDB_CACHE%\ms;srv*https://msdl.microsoft.com/download/symbols
-if exist ".\target\debug" set _NT_SYMBOL_PATH=%_NT_SYMBOL_PATH%^
-;srv**target\debug^
-;srv**target\debug\deps^
-;srv**target\debug\build
-if exist ".\target\release" set _NT_SYMBOL_PATH=%_NT_SYMBOL_PATH%^
-;srv**target\release^
-;srv**target\release\deps^
-;srv**target\release\build
-if exist "%USERPROFILE%\.rustup\toolchains\stable-x86_64-pc-windows-msvc\bin" set _NT_SYMBOL_PATH=%_NT_SYMBOL_PATH%^
-;srv*%USERPROFILE%\.rustup\toolchains\stable-x86_64-pc-windows-msvc\bin^
-;srv*%USERPROFILE%\.rustup\toolchains\stable-x86_64-pc-windows-msvc\lib\rustlib\x86_64-pc-windows-msvc\lib
-if exist "%USERPROFILE%\.rustup\toolchains\nightly-x86_64-pc-windows-msvc\bin" set _NT_SYMBOL_PATH=%_NT_SYMBOL_PATH%^
-;srv*%USERPROFILE%\.rustup\toolchains\nightly-x86_64-pc-windows-msvc\bin^
-;srv*%USERPROFILE%\.rustup\toolchains\nightly-x86_64-pc-windows-msvc\lib\rustlib\x86_64-pc-windows-msvc\lib
-
-
-::
-:: guess where our source code might be (you can tailor these following statements for your environment)
-::
-set PROJECT_SRC_DIR=.\src
-set _NT_SOURCE_PATH=%PROJECT_SRC_DIR%;.\
-if exist "%USERPROFILE%\.rustup\toolchains\stable-x86_64-pc-windows-msvc\lib\rustlib\src\rust" set _NT_SOURCE_PATH=%_NT_SOURCE_PATH%^
-;%USERPROFILE%\.rustup\toolchains\stable-x86_64-pc-windows-msvc\lib\rustlib\src\rust
-if exist "%USERPROFILE%\.rustup\toolchains\nightly-x86_64-pc-windows-msvc\lib\rustlib\src\rust" set _NT_SOURCE_PATH=%_NT_SOURCE_PATH%^
-;%USERPROFILE%\.rustup\toolchains\nightly-x86_64-pc-windows-msvc\lib\rustlib\src\rust
+set DBGHELP_HOMEDIR=%TEMP%\rwindbg\source
+@if NOT exist "%DBGHELP_HOMEDIR%" mkdir "%DBGHELP_HOMEDIR%"
 
 
 ::
@@ -76,25 +58,21 @@ if exist "%USERPROFILE%\.rustup\toolchains\nightly-x86_64-pc-windows-msvc\lib\ru
 ::
 :: (if you want to see the arguments to WinDBG and Rust that are active, comment the next line by adding :: as first two characters)
 goto :skip_over_show_env
-@echo These are the environment settings that WinDBG uses:
-set _NT
-@echo RUST environment will also affect our commands:
-set RU 2>c:\NUL
+@echo === These are the environment settings that WinDBG uses:
+@set _NT
+@set DBGHELP
+@echo ==== RUST environment will also affect our commands:
+@set RU 2>c:\NUL
 :skip_over_show_env
 
 
 ::
 :: create a initialization script for windbg (necessary when some commands require double-quote usage)
 ::
-set WINDBG_INIT_SCRIPT=%TEMP%\rwindbg.windbg
-if exist "%WINDBG_INIT_SCRIPT%" del /q/f "%WINDBG_INIT_SCRIPT%"
-:: the reload will force symbols referenced in your process to be downloaded now (normally demand loaded) 
-@echo .echo ========== .reload /f - forces loading of the symbols associated with our currently loaded modules>> %WINDBG_INIT_SCRIPT%
+@set WINDBG_INIT_SCRIPT=%TEMP%\rwindbg.windbg
+:: the reload will force symbols referenced in your process to be downloaded now (normally demand loaded)
+@echo .echo ========== .reload /f - forces loading of the symbols associated with our currently loaded modules> %WINDBG_INIT_SCRIPT%
 @echo .reload /f>> %WINDBG_INIT_SCRIPT%
-:: lists the modules (DLLs) that are loaded and their associated symbol files, if it was able to find and download them
-@echo .echo ========== lm - show the modules currently loaded to our process>> %WINDBG_INIT_SCRIPT%
-@echo lm>> %WINDBG_INIT_SCRIPT%
-@echo .echo ========== type "k<ENTER>" to see our current stack>> %WINDBG_INIT_SCRIPT%
 :: 'sxe *' tells the debugger to stop when any of the known exceptions happen at the instruction where it happens on the ipc (instruction pointer register)
 ::@echo sxe *>> %WINDBG_INIT_SCRIPT%
 :: an example how to load a WinDBG extension
@@ -122,11 +100,51 @@ if exist "%WINDBG_INIT_SCRIPT%" del /q/f "%WINDBG_INIT_SCRIPT%"
 ::@echo bp KERNELBASE!CreateFileW>> %WINDBG_INIT_SCRIPT%
 :: tell WinDBG to start running the process once it stops on the initial break point, at which point all modules are loaded into the process memory
 ::@echo g>> %WINDBG_INIT_SCRIPT%
+:: load formatters to printout rust data structures in WinDBG
+@pushd %rust_etc_for_natvis%
+@for /f "delims=" %%i in ('dir/s/b *.natvis') do @echo .nvload %%i>> %WINDBG_INIT_SCRIPT%
+@popd
+:: load location of PDBs delivered/built with Rust
+@set PDBPATH_INIT_SCRIPT=%WINDBG_INIT_SCRIPT%_PDBpath
+@echo .sympath cache*%PDB_CACHE%\ms;srv*https://msdl.microsoft.com/download/symbols> %PDBPATH_INIT_SCRIPT%
+@pushd %rust_bin_for_pdb%
+@for /f "delims=" %%i in ('dir/s/b *.pdb')  do @if NOT "%%~dpi" == "!PREV!" @set "PREV=%%~dpi"&(@echo !PREV!>> %PDBPATH_INIT_SCRIPT%)
+@popd
+@echo ^$^$^>^<%PDBPATH_INIT_SCRIPT%>> %WINDBG_INIT_SCRIPT%
+:: load location of src files
+@set SRCPATH_INIT_SCRIPT=%WINDBG_INIT_SCRIPT%_SRCpath
+@echo .srcpath srv*> %SRCPATH_INIT_SCRIPT%
+@pushd %rust_src_for_rs%
+@for /f "delims=" %%i in ('dir/s/b/ad src') do @if NOT "%%~dpi" == "!PREV!" @set "PREV=%%~dpi"&(@echo !PREV!>> %SRCPATH_INIT_SCRIPT%)
+@popd
+@echo ^$^$^>^<%SRCPATH_INIT_SCRIPT%>> %WINDBG_INIT_SCRIPT%
+:: lists the modules (DLLs) that are loaded and their associated symbol files, if it was able to find and download them
+@echo .echo ========== lm - show the modules currently loaded to our process>> %WINDBG_INIT_SCRIPT%
+@echo lm>> %WINDBG_INIT_SCRIPT%
+@echo .echo ========== type "k<ENTER>" to see our current stack>> %WINDBG_INIT_SCRIPT%
+@echo .echo ========== type "~<ENTER>" to see our current threads>> %WINDBG_INIT_SCRIPT%
+@echo .echo ========== type "g<ENTER>" to resume running the program>> %WINDBG_INIT_SCRIPT%
+
 
 ::
 :: prints the windbg command that wil be executed (for informational purposes)
 ::
+goto :skip_debug
+@set RUSTUP_
+@set _NT
+@set DBG
+pause
+@type "%SRCPATH_INIT_SCRIPT%"
+@echo =========================================================
+pause
+@type "%PDBPATH_INIT_SCRIPT%"
+@echo =========================================================
+pause
+@type "%WINDBG_INIT_SCRIPT%"
+@echo =========================================================
+:skip_debug
 @echo start windbg -W Default -c "$><%WINDBG_INIT_SCRIPT%" %*
+
 
 ::
 :: then runs WinDBG passing it all arguments given to this script
@@ -134,6 +152,9 @@ if exist "%WINDBG_INIT_SCRIPT%" del /q/f "%WINDBG_INIT_SCRIPT%"
 start windbg -W Default -c "$><%WINDBG_INIT_SCRIPT%" %*
 
 ::
-:: any environment setting beyond this line will affect the environment settings
+:: any environment setting beyond these lines will affect the environment settings
 ::
 @endlocal
+@endlocal
+
+exit /b 0
