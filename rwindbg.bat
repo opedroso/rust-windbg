@@ -30,6 +30,12 @@
 
 
 ::
+:: set this variable to the type of source files you want the debugger to find
+::
+@set SRC_TYPES_SUPPORTED=*.rs *.cpp *.h *.hpp *.c *.S
+
+
+::
 :: find the default toolchain we are using and load it's source
 ::
 @for /f "delims=" %%i in ('rustc --print=sysroot') do set rustc_sysroot=%%i
@@ -114,8 +120,9 @@ goto :skip_over_show_env
 :: load location of src files
 @set SRCPATH_INIT_SCRIPT=%WINDBG_INIT_SCRIPT%_SRCpath
 @echo .srcpath srv*> %SRCPATH_INIT_SCRIPT%
+@for /f "delims=" %%i in ('dir/s/b/a-d %SRC_TYPES_SUPPORTED%') do @if NOT "%%~dpi" == "!PREV!" @set "PREV=%%~dpi"&(@echo !PREV!>> %SRCPATH_INIT_SCRIPT%)
 @pushd %rust_src_for_rs%
-@for /f "delims=" %%i in ('dir/s/b/ad src') do @if NOT "%%~dpi" == "!PREV!" @set "PREV=%%~dpi"&(@echo !PREV!>> %SRCPATH_INIT_SCRIPT%)
+@for /f "delims=" %%i in ('dir/s/b/a-d %SRC_TYPES_SUPPORTED%') do @if NOT "%%~dpi" == "!PREV!" @set "PREV=%%~dpi"&(@echo !PREV!>> %SRCPATH_INIT_SCRIPT%)
 @popd
 @echo ^$^$^>^<%SRCPATH_INIT_SCRIPT%>> %WINDBG_INIT_SCRIPT%
 :: lists the modules (DLLs) that are loaded and their associated symbol files, if it was able to find and download them
