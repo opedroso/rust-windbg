@@ -116,6 +116,13 @@ goto :skip_over_show_env
 @pushd %rust_bin_for_pdb%
 @for /f "delims=" %%i in ('dir/s/b *.pdb')  do @if NOT "%%~dpi" == "!PREV!" @set "PREV=%%~dpi"&(@echo !PREV!>> %PDBPATH_INIT_SCRIPT%)
 @popd
+:: load location of PDBs in our project (under target*\deps)
+for /f "delims=" %%d in ('dir/s/b/ad deps') do (
+    pushd %%d
+    @for /f "delims=" %%i in ('dir/s/b *.pdb')  do @if NOT "%%~dpi" == "!PREV!" @set "PREV=%%~dpi"&(@echo !PREV!>> %PDBPATH_INIT_SCRIPT%)
+    popd
+)
+:: merge all unique PDB containing directories to windbg init script's symbol path
 @echo ^$^$^>^<%PDBPATH_INIT_SCRIPT%>> %WINDBG_INIT_SCRIPT%
 :: load location of src files
 @set SRCPATH_INIT_SCRIPT=%WINDBG_INIT_SCRIPT%_SRCpath
@@ -124,7 +131,11 @@ goto :skip_over_show_env
 @pushd %rust_src_for_rs%
 @for /f "delims=" %%i in ('dir/s/b/a-d %SRC_TYPES_SUPPORTED%') do @if NOT "%%~dpi" == "!PREV!" @set "PREV=%%~dpi"&(@echo !PREV!>> %SRCPATH_INIT_SCRIPT%)
 @popd
+:: merge all unique source containing directories to windbg init script's source path
 @echo ^$^$^>^<%SRCPATH_INIT_SCRIPT%>> %WINDBG_INIT_SCRIPT%
+:: the reload will force symbols referenced in your process to be downloaded now (normally demand loaded)
+@echo .echo ========== .reload /f /i ^*.exe - forces loading of the symbols for our executable>> %WINDBG_INIT_SCRIPT%
+@echo .reload /f /i ^*.exe>> %WINDBG_INIT_SCRIPT%
 :: lists the modules (DLLs) that are loaded and their associated symbol files, if it was able to find and download them
 @echo .echo ========== lm - show the modules currently loaded to our process>> %WINDBG_INIT_SCRIPT%
 @echo lm>> %WINDBG_INIT_SCRIPT%
