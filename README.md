@@ -1215,8 +1215,9 @@ I would like to set a breakpoint on that function, so I change my `Cargo.toml` f
 
 ```
 [profile.release]
-lto = true          # Enable Link-Time Optimization for smaller binaries; good practice when using large crates like windows
-debug = true        # enable symbols for release builds
+debug = "line-tables-only"  # info for backtraces and profiler (not debuggers)
+split-debuginfo = "packed"  # generate PDB on Windows, DWP on Linux, .dSYM on MacOS
+strip = "none"              # strip symbols and lineinfo from the executable itself during linking are possible
 ```
 
 Once I rebuild the release target and rerun with WinDBG, I now have a result for this command:
