@@ -37,7 +37,7 @@ If you prefer this option, copy the contents of `"C:\Program Files (x86)\Windows
 
 Double check that windbg.exe is in your path before proceeding:  
 (create a new command window, then type this)
-```
+```bat
 r:\repo>where windbg
 C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\windbg.exe
 ```
@@ -54,7 +54,7 @@ We will also set a default Workspace such that we can read the WinDBG UI from an
 
 When we start a process by the WinDBG debugger, the OS loader will load all the require DLL dependencies, and execute a "int 3" instruction. This generates an expected exception of type 0x80000003. The OS function that does it is located in the `ntdll.dll` and has the function name `LdrpDoDebuggerBreak()`. WinDBG displays that as `ntdll!LdrpDoDebuggerBreak`.  
 This would be the address of this function. The "int 3" instruction happens a bit later, so WinDBG shows it with "+0x30" offset to indicate that the "int 3" instruction is located 0x30 bytes into the code 
-```
+```bat
 (67a8.67ac): Break instruction exception - code 80000003 (first chance)
 ntdll!LdrpDoDebuggerBreak+0x30:
 00007ffb`2b2ebd44 cc              int     3
@@ -87,7 +87,7 @@ First commands suggestion, which will make the UI more legible and remember thes
 
     Let's look at each in logical order. We stopped at the "int 3", so lets take a look at it:
 
-    ```
+    ```bat
     0:000> u .
     ntdll!LdrpDoDebuggerBreak+0x30:
     00007ff9`5170bed4 cc              int     3
@@ -129,7 +129,7 @@ First commands suggestion, which will make the UI more legible and remember thes
     <details>
     <summary>What are the instructions leading to our "int 3"?</summary>
 
-    ```
+    ```bat
     0:000> ub .
     ntdll!LdrpDoDebuggerBreak+0x10:
     00007ff9`5170beb4 4c8d442440      lea     r8,[rsp+40h]
@@ -151,7 +151,7 @@ First commands suggestion, which will make the UI more legible and remember thes
 
     The "uf [address]" (unassemble function) command asks WinDBG to walk backwards and forwards from the given address and try to define the extents of our function. Then unassemble it.
 
-    ```
+    ```bat
     0:000> uf .
     ntdll!LdrpDoDebuggerBreak:
     00007ffb`2b2ebd14 4883ec38        sub     rsp,38h
@@ -216,7 +216,7 @@ The necessary environment for running WinDBG is a bit involved:
 - where to download them from
 
 If you are insterested in seeing how this environment is conveyed to WinDBG, you can edit rwindbg.bat and search for these line:
-```
+```bat
 :: (if you want to see the arguments to WinDBG and Rust that are active, comment the next line by adding :: as first two characters)
 goto :skip_over_show_env
 ```
@@ -251,7 +251,7 @@ We then take a look around a process that is not ours (notepad.exe) to learn som
     These are the dependent DLLs. If any of these is missing, the program cannot even be started.  
     This is the output of the "lm" command. It shows each module start and end loading address, the module name, the symbol loading status ("deferred", "pdb symbols", "private pdb symbols") and the symbol filename (only if one is loaded):
 
-    ```
+    ```bat
     ========== lm - show the modules currently loaded to our process
     start             end                 module name
     00007ff6`320a0000 00007ff6`320fa000   notepad    (pdb symbols)          c:\symbols\ms\notepad.pdb\187DDA8685B2AE461B8B6C4FC32FA79C1\notepad.pdb
@@ -276,7 +276,7 @@ We then take a look around a process that is not ours (notepad.exe) to learn som
     ```
 
 - enter the command "lmvM *.exe", which will display the full information for your process executable
-     ```
+     ```bat
     0:000> lmvM *.exe
     Browse full module list
     start             end                 module name
@@ -310,7 +310,7 @@ We then take a look around a process that is not ours (notepad.exe) to learn som
 - Sometimes we have a problem that only happen at a specific OS version. To find out exactly which OS version we are running,
 We can also get more detail about which specific version of the KERNELBASE we are dealing with:
 
-    ```
+    ```bat
     0:000> lmvM *KERNELBASE*
     Browse full module list
     start             end                 module name
@@ -368,7 +368,7 @@ Most of the information displayed by the "lm" command in WinDBG comes from the P
 Execute the following command to take a look at the information it contains for our target executable:
 (On my system, I find it here `"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.39.33519\bin\Hostx64\x64\dumpbin.exe"`)
 
-```
+```bat
 dumpbin /headers target\debug\stack_overflow.exe
 ```
 
@@ -395,7 +395,7 @@ But how are these used you might ask?
 Execute the following command to take a look what dependencies our executable has:
 (On my system, I find it here `"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.39.33519\bin\Hostx64\x64\dumpbin.exe"`)
 
-```
+```bat
 r:\repo\rust-windbg>dumpbin /imports target\debug\stack_overflow.exe | findstr /ir "\.dll$"
     api-ms-win-core-synch-l1-2-0.dll
     KERNEL32.dll
@@ -415,7 +415,7 @@ On the command above, we only checked the filenames if printed out.
 If you look at the actual printout, you will see that each DLL header is followed by the functions our program references from those DLLs. These have to be resolved and their addressed (after being mapped into our process) replaced in our process import table. That is how external functions referenced by our program are found during execution time.
 
 Let's take a look at a single one of them, the VCRUNTIME140.dll:
-```
+```bat
     VCRUNTIME140.dll
              140026158 Import Address Table
              140032818 Import Name Table
@@ -446,7 +446,7 @@ It also seems to borrow these efficient memory copy, compare, and set functions 
 
 - let's look for the address of a Windows 32 API such as CreateFileW() which is how files are opened in Win32
 - we know that we use CreateFileW in notepad.exe, so let's see if that symbol is defined in the executable module:
-```
+```bat
 0:004> x notepad!*CreateFileW
 00007ff7`50669de0 notepad!_imp_CreateFileW = <no type information>
 ```
@@ -456,7 +456,7 @@ Since we don't know where, we will try to find it from all the modules that are 
 At this point of the process created, they are all already loaded, so we should be able to find it.
 
 - enter the command "x *!CreateFileW<ENTER>", results which follows:
-```
+```bat
 0:004> x *!CreateFileW
 00007ffd`2eb149f0 KERNELBASE!CreateFileW (CreateFileW)
 00007ffd`2f230460 KERNEL32!CreateFileW (CreateFileW)
@@ -467,7 +467,7 @@ At this point of the process created, they are all already loaded, so we should 
 
 - issue the command "lma 00007ffd`2eb149f0" which is the address of the first CreateFileW returned by the "x" command above  
   - (you may have to enter the value your "x *!CreateFileW" printed out, since it might be different than mine)
-```
+```bat
 0:004> lma 00007ffd`2eb149f0
 Browse full module list
 start             end                 module name
@@ -476,7 +476,7 @@ start             end                 module name
 
 Now that we know where the function actually is, we can set a breakpoint.  
 This can be done using the address or the name.
-```
+```bat
 0:000> bp KERNELBASE!CreateFileW
 0:000> bl
      0 e Disable Clear  00007fff`6e6149f0     0001 (0001)  0:**** KERNELBASE!CreateFileW
@@ -490,7 +490,7 @@ When I click on Disable, the command "bd 0" is executed.
 Typing the command "bc 0" will clear (delete) the breakpoint.
 
 In general all the links on the WinDBG UI are accelerator to commands like that
-```
+```bat
 0:000> bp KERNELBASE!CreateFileW
 0:000> bl
      0 e Disable Clear  00007fff`6e6149f0     0001 (0001)  0:**** KERNELBASE!CreateFileW
@@ -554,17 +554,20 @@ On this new run, we find out that the exit code is 0xC00000FD, which is the Wind
 <summary>What are other Windows errors, exception codes and their associated messages?</summary>
 
 You can all see all other possible Windows errors and their associated message by inspecting this file delivered as part of the Windows SDK:  
-     [ntstatus.h](file:///C:/Program%20Files%20(x86)/Windows%20Kits/10/Include/10.0.22621.0/shared/ntstatus.h)
+
+[ntstatus.h](file:///C:/Program%20Files%20(x86)/Windows%20Kits/10/Include/10.0.22621.0/shared/ntstatus.h)  
 
 Another interesting file contains all possible results for the Win32 API GetLastError(), which is also part of the Windows SDK:  
-     [winerror.h](file:///C:/Program%20Files%20(x86)/Windows%20Kits/10/Include/10.0.22621.0/shared/winerror.h)
+
+[winerror.h](file:///C:/Program%20Files%20(x86)/Windows%20Kits/10/Include/10.0.22621.0/shared/winerror.h)
+
 </details>
 <details>
 <summary>Interesting that running it in Release gives different result</summary>
 
 Using `cargo run --release`, we get a different, although still incorrect, result:
 
-```
+```bat
 r:\repo\rust-windbg>cargo run --release --bin stack_overflow
    Compiling rust-windbg v0.1.0 (R:\repo\rust-windbg)
     Finished `release` profile [optimized] target(s) in 1.00s
@@ -587,7 +590,7 @@ Let's run the DEBUG stack_overflow.exe under WinDBG and see what we can learn.
 You will see a printout of the command it executes and then two new windows are created:
 
 1) the script will printout the actual command it executes:  
-   ```
+   ```bat
    start windbg -W Default -c "$><C:\Users\opedr\AppData\Local\Temp\rwindbg.windbg" target\debug\stack_overflow.exe
    ```
 2) A Windbg process waiting for a command on a prompt field like this `0:000> `
@@ -604,7 +607,7 @@ Sometimes the help dialog will open but the right article is not shown. In this 
 On this page we learn that we can use the character "|" to get the current process status and the character "~" to get the current thread status.
 Let's try them out
 
-```
+```bat
 windbg> .hh thread
 0:000> |
 .  0	id: 722c	create	name: stack_overflow.exe
@@ -636,7 +639,7 @@ On this page title `Thread Syntax`, we learn that:
 We can also ask for a command to be executed on a specific thread context, such as asking what was the last error that happened on that thread.  
 That is, what was the last value someone called the Win32 API SetLastError() with, or what was the last status value of a kernel operation on this thread:
 
-```
+```bat
 0:000> ~*e !gle
 LastErrorValue: (Win32) 0xbb (187) - The specified system semaphore name was not found.
 LastStatusValue: (NTSTATUS) 0 - STATUS_SUCCESS
@@ -651,7 +654,7 @@ LastStatusValue: (NTSTATUS) 0 - STATUS_SUCCESS
 We can also ask to see the stack for each thread to get an overall picture of what is happening in our process right now.  
 At this time, I don't expect anything very interesting since we are starting the process and not much has happened from the user program point of view.
 
-```
+```bat
 0:000> ~*k
 
 .  0  Id: 722c.206c Suspend: 1 Teb: 0000004e`3b1bc000 Unfrozen
@@ -695,18 +698,18 @@ This command allows the application's exception handler to handle the exception.
 Remember, you can always do ".hh gn" to read the details in the WinDBG Help.  
 
 Once "gn<ENTER>" is pressed, WindDBG shows that the debuggee is now running:
-```
+```bat
 *BUSY* | Debuggee is running...
 ```
 
 Change your focus to the terminal window and answer the question there:
-```
+```bat
 Hello from thread1!
 Enter a non-negative integer: 100
 ```
 
 Look back at the WinDBG window and you see that the stack overflow event has happened:
-```
+```bat
 0:000> gn
 (722c.31fc): Stack overflow - code c00000fd (first chance)
 First chance exceptions are reported before any exception handling.
@@ -716,7 +719,7 @@ stack_overflow!stack_overflow::factorial+0x7:
 ```
 If our source setup is correct and our code build did produce a PDB containing the symbol file, WinDBG will open the associated source file and display the line number where the event happened:  
 (I marked the first line with '>>>' to indicate which line WinDBG highlighted on my screen)
-```
+```bat
 ...
 >>> fn factorial(arg: FactorialArgument) -> u64 {
     if arg.idx == 0 {
@@ -735,7 +738,7 @@ If our source setup is correct and our code build did produce a PDB containing t
 
 I am curious to see what our other threads have been doing when this event took place that stop all threads.  
 So I execute "~" to see all our current threads:
-```
+```bat
 0:004> ~
    0  Id: 722c.206c Suspend: 1 Teb: 0000004e`3b1bc000 Unfrozen "main"
 .  4  Id: 722c.31fc Suspend: 1 Teb: 0000004e`3b1c4000 Unfrozen "thread1"
@@ -745,7 +748,7 @@ Interesting, seems like our original threads indices 1, 2, and 3 have since term
 There is a new thread, index 4, which is the one that we create in our source with a smallish stack to force the stack overflow.
 
 I now execute a "~#" which tells me which thread caused the debug event that stopped the execution:
-```
+```bat
 0:004> ~#
 .  4  Id: 722c.31fc Suspend: 1 Teb: 0000004e`3b1c4000 Unfrozen "thread1"
       Start: stack_overflow!std::sys::pal::windows::thread::impl$0::new::thread_start (00007ff7`1e225050)
@@ -753,7 +756,7 @@ I now execute a "~#" which tells me which thread caused the debug event that sto
 ```
 
 And finally we see what are the current stack traces for all threads:
-```
+```bat
 0:004> ~*k
 
    0  Id: 722c.206c Suspend: 1 Teb: 0000004e`3b1bc000 Unfrozen "main"
@@ -790,7 +793,7 @@ And finally we see what are the current stack traces for all threads:
 
 So we can see that thread index 0 (the main thread) is waiting for the thread we created to complete its processing and return (rejoin):
 (I only copy here the detail of the three top entries on the stack for the main thread)
-```
+```bat
    0  Id: 722c.206c Suspend: 1 Teb: 0000004e`3b1bc000 Unfrozen "main"
  # Child-SP          RetAddr               Call Site
 00 0000004e`3af7f248 00007ffe`a95d427e     ntdll!NtWaitForSingleObject+0x14
@@ -810,7 +813,7 @@ Or click on the original source path as shown after the function name on the sam
 WinDBG will work its magic and translate from the address contained on the stack to the source file and line number on your disk and open the source file for your enjoyment.
 
 Because the rwindbg script setup our source path and we did `rustup component add rust-src` during setup, you can click on the source path between the square brackets above and see what is the implementation of fn join():
-```
+```rust,ignore
     pub fn join(self) {
         let rc = unsafe { c::WaitForSingleObject(self.handle.as_raw_handle(), c::INFINITE) };
 >>>        if rc == c::WAIT_FAILED {
@@ -821,11 +824,11 @@ Because the rwindbg script setup our source path and we did `rustup component ad
 
 So after our script setup, WinDBG knows how to translate the source filename contained in the PDB for std implementation and our current download location for the rust-src component.
 From:
-```
+```bat
 /rustc/9b00956e56009bab2aa15d7bff10916599e3d6d6/library\std\src\sys\pal\windows\thread.rs
 ```
 to
-```
+```bat
 C:\Users\opedr\.rustup\toolchains\stable-x86_64-pc-windows-msvc\lib\rustlib\src\rust\library\std\src\sys\pal\windows\thread.rs
 ```
 </details>
@@ -853,7 +856,7 @@ In WinDbg, the command prompt numbers provide information about the debugging se
 <summary>So, how big is our thread's stack anyway?</summary>
 
 Next, let's take a look at our Thread Execution Block. The TEB keeps information like the values of the CPU registers, the last time the thread was interrupted, the stack limits, ...
-```
+```bat
 0:004> .lastevent
 Last event: 722c.31fc: Stack overflow - code c00000fd (first chance)
   debugger time: Sat May 25 15:35:47.056 2024 (UTC + 2:00)
@@ -881,7 +884,7 @@ Evaluate expression: 61440 = 00000000`0000f000
 So, from looking at the TEB, it tells me that my thread stack is actually 61440 bytes.  
 That is exactly 60 KiB. Remember that a stack is always [[committed stack][page guard] reserved stack].
 That would make our stack be 64 KiB total size. Even though in code we asked for a (8 * 1024) stack.
-```
+```rust
     // Create a builder for the thread
     let builder = thread::Builder::new()
         .name("thread1".to_string()) // Set thread name
@@ -896,7 +899,7 @@ Another mistery.
 
 Our stack minimum requirements can be gleamed by seeing what is our threads stack usage by the time we call factorial() the first time.
 Let's exit our current debugging session and start a new one:
-```
+```bat
 rwindbg target/debug/stack_overflow.exe
 
 
@@ -993,7 +996,7 @@ So when we first call factorial in our thread, this thread's stack usage is 4648
 Reason being, I know from experience that Windows assigns a 1 MiB stack size for an executable.
 That becomes the default size for all threads created unless they change it during creation.
 
-```
+```bat
 0:004> ~0s
 ntdll!NtWaitForSingleObject+0x14:
 00007ffe`ac2af9d4 c3              ret
@@ -1023,7 +1026,7 @@ Interesting, the TEB says that the stack for the main thread is just 16 KiB.
 Researching further, I used the command dumpbin to inspect our executable:
 (On my system, I find it here `"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.39.33519\bin\Hostx64\x64\dumpbin.exe"`)
 
-```
+```bat
 r:\repo\rust-windbg>dumpbin /headers target\debug\stack_overflow.exe | findstr /c:"size of stack" /c:"Dump of file"
 Dump of file target\debug\stack_overflow.exe
           100000 size of stack reserve
@@ -1059,7 +1062,7 @@ I prefer to write a function in Rust that can inquire the OS what is are the act
 I generated a stack_overflow_v2 program with a print_stack().  
 It now prints the stack extents for both the main thread and the thread created with a smaller stack:
 
-```
+```bat
 r:\repo\rust-windbg>cargo run --release --bin stack_overflow_v2
     Finished `release` profile [optimized] target(s) in 0.49s
      Running `target\release\stack_overflow_v2.exe`
@@ -1101,7 +1104,7 @@ They are contiguous in memory. We should not rely on this information but it is 
 <summary>Let's dig deeper and see when it runs out of stack by inspecting function local variables</summary>
 First, let's revisit the stack of our faulting thread:
 
-```
+```bat
 * set our current thread to be the faulting thread
 ~#s
 * show the stack
@@ -1110,7 +1113,7 @@ First, let's revisit the stack of our faulting thread:
 
 Notice first two characters on each stack entry. That is the frame index. Let's look at the first
 
-```
+```bat
 0:004> * make frame 01 the current frame; we will be able to see the local variables at that point in time
 0:004> .frame 1
 01 00000014`63127180 00007ff6`25fa86a5     stack_overflow!stack_overflow::factorial+0x115 [R:\repo\rust-windbg\bug_samples\stack_overflow.rs @ 42] 
@@ -1173,7 +1176,7 @@ Notice first two characters on each stack entry. That is the frame index. Let's 
 
 Let's take a look at why the RELEASE target gives a different error.
 I execute the latest version of the program in release and see that it still behave a bit differently:  
-```
+```bat
 r:\repo\rust-windbg>cargo run --release --bin stack_overflow_v2
     Finished `release` profile [optimized] target(s) in 0.01s
      Running `target\release\stack_overflow_v2.exe`
@@ -1190,7 +1193,7 @@ The factorial of 100 is: 0
 ```
 
 I then proceed to run it under the debugger using the script:  
-```
+```bat
 r:\repo\rust-windbg>rwindbg target\release\stack_overflow_v2.exe
 start windbg -W Default -c "$><C:\Users\opedr\AppData\Local\Temp\rwindbg.windbg" target\release\stack_overflow_v2.exe
 ```
@@ -1200,7 +1203,7 @@ Next I go to the "fn factorial" by clicking "CTRL+f" and typing "fn factorial" o
 Once found, if you look at the bottom right of the WinDBG window, you will see "ln: 43" indicating where the "fn factorial" is located.  
 With my cursor on that line, I click on F9, which will set a breakpoint, but I get a dialog that says:  
 ( that is literally what you get if you click "CTRL+SHIFT+c" with that dialog in focus )
-```
+```bat
 ---------------------------
 WinDbg:10.0.22621.2428 AMD64 
 ---------------------------
@@ -1213,7 +1216,7 @@ OK
 Most likely the reason is that the RELEASE mode optimizations inlined my function so the debugger cannot get a good handle where the function begins now.  
 I would like to set a breakpoint on that function, so I change my `Cargo.toml` file to have this entry:  
 
-```
+```toml
 [profile.release]
 debug = "line-tables-only"  # info for backtraces and profiler (not debuggers)
 split-debuginfo = "packed"  # generate PDB on Windows, DWP on Linux, .dSYM on MacOS
@@ -1222,7 +1225,7 @@ strip = "none"              # strip symbols and lineinfo from the executable its
 
 Once I rebuild the release target and rerun with WinDBG, I now have a result for this command:
 
-```
+```bat
 0:000> x stack*!*factorial*
 00007ff6`05ba1eac stack_overflow_v2!stack_overflow_v2::factorial =  (inline caller) stack_overflow_v2!std::sys_common::backtrace::__rust_begin_short_backtrace<stack_overflow_v2::main::closure_env$0,tuple$<> >+eac
 ```
@@ -1231,14 +1234,14 @@ The "(inline caller)" tells me that the Rust compiler inlined my factorial funct
 That might be good for performance but not very helpful for debugging.  
 So I go back to the source and add a hint to no longer inline this function.
 
-```
+```rust,ignore
 #[inline(never)]
 fn factorial(arg: FactorialArgument) -> u64 {
 ```
 
 After I rebuild and rerun it with WinDBG I now get this result, which indicates my function is not longer inlined:  
 
-```
+```bat
 0:000> x stack*!*factorial*
 00007ff7`d66d3510 stack_overflow_v2!stack_overflow_v2::factorial (void)
 ```
@@ -1246,7 +1249,7 @@ After I rebuild and rerun it with WinDBG I now get this result, which indicates 
 This time, after I search for "fn factorial", which is now found on line 44, and type F9, the UI reflects that a breakpoint was added by showing that line with a red background.
 Executing "bl" also shows that we now have a breakpoint there:
 
-```
+```bat
 0:000> bl
      0 e Disable Clear  00007ff7`d66d3510     0001 (0001)  0:**** stack_overflow_v2!stack_overflow_v2::factorial
 ```
@@ -1266,7 +1269,7 @@ As you can see this is also how the debugger can implement single step instructi
 
 From our previous runs, I now that the stack overflow happens on the 8th call to factorial, so I modify the breakpoint to conditionally stop only on the 8th pass:  
 
-```
+```bat
 0:000> bp0 stack_overflow_v2!stack_overflow_v2::factorial 8 "dv"
 breakpoint 0 exists, redefining
 0:000> bl
@@ -1277,7 +1280,7 @@ I proceed with the execution, but get a surprise result.
 The function once again completes without reaching the 8th breakpoint.  
 The "bl" command shows that it the count reached 7 before the program ended.  
 
-```
+```bat
 0:000> gn
 ModLoad: 00007ffe`90c80000 00007ffe`90c98000   C:\WINDOWS\SYSTEM32\kernel.appcore.dll
 ModLoad: 00007ffe`937f0000 00007ffe`93897000   C:\WINDOWS\System32\msvcrt.dll
@@ -1300,7 +1303,7 @@ ntdll!NtTerminateProcess+0x14:
 The program ends. I check my breakpoint and its counter tells me that it passed the breakpoint 7 times and that it will stop on the 8th, but it never reached it.
 I then proceed to restart the process and reduce the count to 7 for the next run:  
 
-```
+```bat
 0:000> .restart
 ...
 0:000> bp0 stack_overflow_v2!stack_overflow_v2::factorial 7 "dv"
@@ -1317,7 +1320,7 @@ What seems to happen now is a numeric overflow. My reasoning comes to this becau
 
 Learned that Rust does not perform overflow checking on Release targets by default due to performance reasons. But that we can enable that by changing our `Cargo.toml` file like this:  
 
-```
+```toml
 [profile.release]
 lto = true                  # Enable Link-Time Optimization for smaller binaries; good practice when using large crates like windows
 debug = 2                   # enable symbols for release builds
@@ -1325,7 +1328,7 @@ split-debuginfo = "packed"  # Store debug info in a separate file
 overflow-checks = true      # enable arithmetic overflow checks ()
 ```
 
-Be aware that adding `lto` will dramatically increase the link time. I had builds that take 1.5 seconds to complete under the `profile.dev` now take 15+ seconds after `lto` was added. 
+Be aware that adding `lto` will dramatically increase the link time. I had builds that take 1.5 seconds to complete under the `profile.dev` now take 15+ seconds after `lto` was added. Check for yourself if it is worth it for your project.
 The `Cargo.toml` token setting of `split-debuginfo = "packed"` directs the Rust toolchain to extract debug information present in the object files (function address, variable offsets, line number to address mappings) to a separate symbol file that can then be made available to interested parties. Be aware that having this information makes it much easier to reverse engineer your executable. Also that different platforms provide different file format with this information:
 
 Platform | Toolchain | File Extension | Notes
