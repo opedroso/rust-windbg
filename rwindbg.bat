@@ -46,6 +46,12 @@
 
 
 ::
+:: find the base of our repository; symbols will be found relative to it
+::
+@for /f "delims=" %%i in ('git rev-parse --show-toplevel') do set REPO_BASE=%%i
+set "REPO_BASE=%REPO_BASE:/=\%"
+
+::
 :: where downloaded PDB (symbol files) will be cached
 ::
 set PDB_CACHE=%TEMP%\rwindbg\symbols
@@ -117,11 +123,14 @@ goto :skip_over_show_env
 @for /f "delims=" %%i in ('dir/s/b *.pdb')  do @if NOT "%%~dpi" == "!PREV!" @set "PREV=%%~dpi"&(@echo !PREV!>> %PDBPATH_INIT_SCRIPT%)
 @popd
 :: load location of PDBs in our project (under target*\deps)
+
+pushd %REPO_BASE%
 for /f "delims=" %%d in ('dir/s/b/ad deps') do (
     pushd %%d
     @for /f "delims=" %%i in ('dir/s/b *.pdb')  do @if NOT "%%~dpi" == "!PREV!" @set "PREV=%%~dpi"&(@echo !PREV!>> %PDBPATH_INIT_SCRIPT%)
     popd
 )
+popd
 :: merge all unique PDB containing directories to windbg init script's symbol path
 @echo ^$^$^>^<%PDBPATH_INIT_SCRIPT%>> %WINDBG_INIT_SCRIPT%
 :: load location of src files
